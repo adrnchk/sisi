@@ -21,8 +21,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from mcp.server.fastmcp import FastMCP  # noqa: E402
+from mcp.server.fastmcp import FastMCP, Image  # noqa: E402
+from PIL import ImageGrab  # noqa: E402
 
+from sisi import activity  # noqa: E402
 from sisi.paths import MEMORY, WALLPAPERS  # noqa: E402
 from sisi.store import add_reminder, get_state, log_action, update_state  # noqa: E402
 
@@ -203,6 +205,38 @@ def list_running_apps() -> str:
         if len(row) >= 9 and row[8] not in ("N/A", "", "Н/Д"):
             apps.add(row[0].removesuffix(".exe"))
     return ", ".join(sorted(apps, key=str.casefold)) or "Нічого не знайшла."
+
+
+@mcp.tool()
+def look_at_screen():
+    """Робить знімок екрана, щоб побачити, чим хазяїн зараз зайнятий. Знімок не зберігається на диск.
+    Використовуй, коли це справді допоможе розмові (це «дорого», не роби часто)."""
+    proc, title = activity.foreground()
+    if activity.categorize(proc, title)[0] == "private":
+        return "На екрані щось особисте (банк/логін) — не дивлюсь."
+    img = ImageGrab.grab(all_screens=True).convert("RGB")
+    img.thumbnail((1600, 1600))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=70)
+    log_action("look_at_screen", f"{proc} | {title[:80]}")
+    return Image(data=buf.getvalue(), format="jpeg")
+
+
+@mcp.tool()
+def current_activity() -> str:
+    """Яке вікно зараз активне і що це за заняття (YouTube, робота, чат тощо)."""
+    proc, title = activity.foreground()
+    return activity.categorize(proc, title)[1]
+
+
+@mcp.tool()
+def browser_history(minutes: int = 60, search: str = "", limit: int = 30) -> str:
+    """Історія браузера Opera: що хазяїн відкривав за останні `minutes` хвилин (до 7 днів).
+    `search` — фільтр за словом у заголовку чи домені. Банки й сторінки входу приховано."""
+    minutes = max(1, min(minutes, 7 * 24 * 60))
+    items = activity.opera_history(minutes=minutes, limit=max(1, min(limit, 100)), search=search)
+    log_action("browser_history", f"{minutes} хв, пошук «{search}»")
+    return activity.format_history(items)
 
 
 @mcp.tool()

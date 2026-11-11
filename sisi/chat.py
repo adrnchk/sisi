@@ -1,11 +1,12 @@
-"""Консольний чат із Сісі. Запуск: run_sisi.bat"""
+"""Консольний чат із Сісі + фоновий спостерігач. Запуск: run_sisi.bat"""
 import re
 import sys
 import threading
 import time
 
 from . import brain
-from .store import pop_due_reminders
+from .notify import toast
+from .watcher import Watcher
 
 NAME = "Сісі"
 _print_lock = threading.Lock()
@@ -16,27 +17,30 @@ def _bubbles(text: str):
     return [p.strip() for p in parts if p.strip()]
 
 
-def say(text: str):
+def say(text: str, prefix: str = ""):
     with _print_lock:
         for i, part in enumerate(_bubbles(text)):
             if i:
                 time.sleep(min(0.4 + len(part) * 0.02, 2.0))  # ніби друкує
-            print(f"\n{NAME}: {part}")
+            print(f"\n{prefix}{NAME}: {part}")
         print()
 
 
-def _reminder_loop():
-    while True:
-        for r in pop_due_reminders():
-            with _print_lock:
-                print(f"\n\n⏰ {NAME}: {r['message']}\n\nТи: ", end="", flush=True)
-        time.sleep(10)
+def deliver(text: str, kind: str):
+    """Репліка, яку Сісі пише першою (подія або нагадування)."""
+    bubbles = _bubbles(text)
+    icon = "⏰ " if kind == "reminder" else "💬 "
+    toast(" · ".join(bubbles[:3]))
+    print()  # з нового рядка, навіть якщо хазяїн щось друкує
+    say(text, prefix=icon)
+    with _print_lock:
+        print("Ти: ", end="", flush=True)
 
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stdin.reconfigure(encoding="utf-8")
-    threading.Thread(target=_reminder_loop, daemon=True).start()
+    Watcher(deliver).start()
     print(f"{NAME} онлайн. Команди: /нова — нова розмова, /вихід — вийти.\n")
     while True:
         try:

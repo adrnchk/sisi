@@ -4,12 +4,14 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 from datetime import datetime
 
 from .paths import HOME, MCP_CONFIG, MEMORY, PERSONA, ROOT
 from .store import get_state, update_state
 
 MODEL = os.environ.get("SISI_MODEL", "sonnet")
+USE_CHROME = os.environ.get("SISI_CHROME", "1") != "0"
 WEEKDAYS = ["понеділок", "вівторок", "середа", "четвер", "пʼятниця", "субота", "неділя"]
 
 
@@ -68,6 +70,9 @@ def _run(message, session_id):
         "--permission-mode", "dontAsk",
         "--disable-slash-commands",
     ]
+    if USE_CHROME:
+        # Claude in Chrome: вкладки й дії в браузері користувача (потрібне розширення)
+        cmd += ["--chrome", "--allowedTools", "mcp__claude-in-chrome"]
     if session_id:
         cmd += ["--resume", session_id]
     proc = subprocess.run(cmd, cwd=HOME, env=_clean_env(), capture_output=True, text=True,
@@ -81,18 +86,38 @@ def _run(message, session_id):
     return data
 
 
+_lock = threading.Lock()  # чат і спостерігач не мають смикати одну сесію одночасно
+SKIP = "SKIP"
+
+
+def _send(message: str) -> str:
+    with _lock:
+        session_id = get_state().get("session_id")
+        try:
+            data = _run(message, session_id)
+        except BrainError:
+            if not session_id:
+                raise
+            data = _run(message, None)  # сесію не вдалось продовжити — починаємо нову
+        update_state(session_id=data.get("session_id"))
+        return data.get("result", "").strip()
+
+
 def reply(user_text: str) -> str:
     """Надсилає повідомлення хазяїна і повертає відповідь Сісі (сирий текст з розділювачами ---)."""
-    message = f"{_time_tag()}\n{user_text}"
-    session_id = get_state().get("session_id")
-    try:
-        data = _run(message, session_id)
-    except BrainError:
-        if not session_id:
-            raise
-        data = _run(message, None)  # сесію не вдалось продовжити — починаємо нову
-    update_state(session_id=data.get("session_id"))
-    return data.get("result", "").strip()
+    return _send(f"{_time_tag()}\n{user_text}")
+
+
+def event(description: str):
+    """Повідомляє Сісі про подію на ПК. Повертає її репліку або None, якщо їй нема що сказати."""
+    text = _send(
+        f"{_time_tag()}\n[подія — це НЕ повідомлення від хазяїна, а те, що ти помітила сама]\n"
+        f"{description}\n"
+        f"Якщо тобі справді є що сказати — напиши хазяїну першою. Якщо ні — відповідай рівно {SKIP}."
+    )
+    if not text or text.strip().strip(".").upper() == SKIP:
+        return None
+    return text
 
 
 def new_session():
