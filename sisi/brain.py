@@ -7,11 +7,17 @@ import sys
 import threading
 from datetime import datetime
 
-from .paths import HOME, MCP_CONFIG, MEMORY, PERSONA, ROOT
+import psutil
+
+from .paths import DATA, HOME, MCP_CONFIG, MEMORY, PERSONA, ROOT
+from . import settings
 from .store import get_state, update_state
 
 MODEL = os.environ.get("SISI_MODEL", "sonnet")
 USE_CHROME = os.environ.get("SISI_CHROME", "1") != "0"
+# Вбудовані інструменти Claude Code. Файли й PowerShell — під хуком guard.py
+BUILTIN_TOOLS = ["WebSearch", "WebFetch", "Read", "Edit", "Write", "Glob", "Grep", "PowerShell"]
+GUARD_SETTINGS = DATA / "guard_settings.json"
 WEEKDAYS = ["понеділок", "вівторок", "середа", "четвер", "пʼятниця", "субота", "неділя"]
 
 
@@ -40,6 +46,21 @@ def _write_mcp_config():
     MCP_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _write_guard_settings():
+    """Хук-запобіжник (sisi/guard.py) перевіряє кожен виклик файлових інструментів і PowerShell."""
+    guard = f'"{sys.executable}" "{ROOT / "sisi" / "guard.py"}"'
+    cfg = {"hooks": {"PreToolUse": [{
+        "matcher": "|".join(t for t in BUILTIN_TOOLS if t not in ("WebSearch", "WebFetch")),
+        "hooks": [{"type": "command", "command": guard}],
+    }]}}
+    GUARD_SETTINGS.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    return GUARD_SETTINGS
+
+
+def _drives():
+    return [p.device for p in psutil.disk_partitions(all=False) if "fixed" in p.opts]
+
+
 def _time_tag():
     now = datetime.now()
     return f"[зараз: {WEEKDAYS[now.weekday()]}, {now:%d.%m.%Y %H:%M}]"
@@ -64,12 +85,17 @@ def _run(message, session_id):
         "--output-format", "json",
         "--model", MODEL,
         "--system-prompt", _system_prompt(),
+        # персона й пам'ять перечитуються щоразу, а не «заморожуються» на початку розмови
+        "--system-prompt-snapshot", "off",
         "--mcp-config", str(MCP_CONFIG), "--strict-mcp-config",
-        "--tools", "WebSearch,WebFetch",
-        "--allowedTools", "mcp__sisi", "WebSearch", "WebFetch",
+        "--tools", ",".join(BUILTIN_TOOLS),
+        "--allowedTools", "mcp__sisi", *BUILTIN_TOOLS,
+        "--add-dir", *_drives(),
         "--permission-mode", "dontAsk",
         "--disable-slash-commands",
     ]
+    if settings.get("guard"):
+        cmd += ["--settings", str(_write_guard_settings())]
     if USE_CHROME:
         # Claude in Chrome: вкладки й дії в браузері користувача (потрібне розширення)
         cmd += ["--chrome", "--allowedTools", "mcp__claude-in-chrome"]

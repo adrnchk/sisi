@@ -13,7 +13,7 @@ from pathlib import Path
 
 import psutil
 
-from . import activity, brain
+from . import activity, brain, settings
 from .store import get_state, log_action, pop_due_reminders, update_state
 
 # ---- налаштування ----
@@ -87,7 +87,8 @@ class Watcher:
 
     @property
     def in_game(self):
-        return bool(self.game_started)
+        """Ігровий режим: запущена гра або ввімкнено вручну в треї."""
+        return bool(self.game_started) or settings.get("game_mode")
 
     def _rate_ok(self, now):
         self.sent_times = [t for t in self.sent_times if now - t < timedelta(hours=1)]
@@ -258,6 +259,11 @@ class Watcher:
     # ---------- цикл ----------
 
     def tick(self):
+        if settings.get("paused"):
+            return
+        if (not settings.get("game_mode") and not self.game_started and self.away_since is None
+                and (self.held or self.held_reminders)):
+            self._flush_held(None)  # ігровий режим вимкнули вручну — віддати відкладене
         now = datetime.now()
         self._check_reminders()
         self._check_games(now)
