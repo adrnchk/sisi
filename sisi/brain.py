@@ -1,0 +1,99 @@
+"""Мозок Сісі: Claude Code у headless-режимі (claude -p) через підписку."""
+import json
+import os
+import shutil
+import subprocess
+import sys
+from datetime import datetime
+
+from .paths import HOME, MCP_CONFIG, MEMORY, PERSONA, ROOT
+from .store import get_state, update_state
+
+MODEL = os.environ.get("SISI_MODEL", "sonnet")
+WEEKDAYS = ["понеділок", "вівторок", "середа", "четвер", "пʼятниця", "субота", "неділя"]
+
+
+class BrainError(RuntimeError):
+    pass
+
+
+def _claude_exe():
+    exe = shutil.which("claude")
+    if not exe:
+        raise BrainError("Не знайдено команду `claude`. Встанови Claude Code CLI і перезапусти термінал.")
+    return exe
+
+
+def _system_prompt():
+    persona = PERSONA.read_text(encoding="utf-8")
+    memory = MEMORY.read_text(encoding="utf-8") if MEMORY.exists() else ""
+    return f"{persona}\n\n---\n\n{memory}"
+
+
+def _write_mcp_config():
+    cfg = {"mcpServers": {"sisi": {
+        "command": sys.executable,
+        "args": [str(ROOT / "sisi" / "tools_server.py")],
+    }}}
+    MCP_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _time_tag():
+    now = datetime.now()
+    return f"[зараз: {WEEKDAYS[now.weekday()]}, {now:%d.%m.%Y %H:%M}]"
+
+
+def _clean_env():
+    """Якщо Сісі запущено зсередини іншої сесії Claude Code, прибираємо її змінні,
+    щоб дочірній claude брав звичайний вхід користувача, а не налаштування хоста."""
+    env = dict(os.environ)
+    if "CLAUDECODE" in env:
+        for k in list(env):
+            if k.startswith(("CLAUDE_CODE_", "CLAUDE_AGENT_SDK_")) or k in (
+                    "CLAUDECODE", "CLAUDE_PID", "ANTHROPIC_BASE_URL", "CLAUDE_PREVIEW_CLASSIFIER_FLOOR"):
+                env.pop(k)
+    return env
+
+
+def _run(message, session_id):
+    _write_mcp_config()
+    cmd = [
+        _claude_exe(), "-p", message,
+        "--output-format", "json",
+        "--model", MODEL,
+        "--system-prompt", _system_prompt(),
+        "--mcp-config", str(MCP_CONFIG), "--strict-mcp-config",
+        "--tools", "WebSearch,WebFetch",
+        "--allowedTools", "mcp__sisi", "WebSearch", "WebFetch",
+        "--permission-mode", "dontAsk",
+        "--disable-slash-commands",
+    ]
+    if session_id:
+        cmd += ["--resume", session_id]
+    proc = subprocess.run(cmd, cwd=HOME, env=_clean_env(), capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", timeout=600)
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        raise BrainError((proc.stderr or proc.stdout or "порожня відповідь").strip()[-800:]) from None
+    if data.get("is_error"):
+        raise BrainError(str(data.get("result") or data))
+    return data
+
+
+def reply(user_text: str) -> str:
+    """Надсилає повідомлення хазяїна і повертає відповідь Сісі (сирий текст з розділювачами ---)."""
+    message = f"{_time_tag()}\n{user_text}"
+    session_id = get_state().get("session_id")
+    try:
+        data = _run(message, session_id)
+    except BrainError:
+        if not session_id:
+            raise
+        data = _run(message, None)  # сесію не вдалось продовжити — починаємо нову
+    update_state(session_id=data.get("session_id"))
+    return data.get("result", "").strip()
+
+
+def new_session():
+    update_state(session_id=None)
