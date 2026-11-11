@@ -26,8 +26,11 @@ class Tray:
         self.app = app
         S = settings
         item = pystray.MenuItem
+        has_window = hasattr(app, "show_window")
         self.icon = pystray.Icon("sisi", _icon_image(S.get("paused")), "Сісі", menu=pystray.Menu(
-            item(lambda _: "▶ Розбудити Сісі" if S.get("paused") else "⏸ Повна пауза", self._pause, default=True),
+            item("💬 Відкрити чат", lambda: app.show_window(), default=True, visible=has_window),
+            item(lambda _: "▶ Розбудити Сісі" if S.get("paused") else "⏸ Повна пауза", self._pause,
+                 default=not has_window),
             item("🎮 Ігровий режим", lambda: S.toggle("game_mode"), checked=lambda _: S.get("game_mode")),
             item("🛡 Запобіжник", lambda: S.toggle("guard"), checked=lambda _: S.get("guard")),
             pystray.Menu.SEPARATOR,
@@ -35,6 +38,7 @@ class Tray:
             item("🎙 Голосовий ввід", lambda: S.toggle("voice_input"), checked=lambda _: S.get("voice_input")),
             item(lambda _: f"⌨ Кнопка push-to-talk: {S.get('ptt_key')}", self._set_key),
             item("🎤 Мікрофон", pystray.Menu(lambda: self._mic_items())),
+            item("🖼 Оновити спрайти", lambda: app.js("clearSprites"), visible=has_window),
             pystray.Menu.SEPARATOR,
             item("Вийти", self._quit),
         ))

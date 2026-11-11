@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<title>Сісі</title>
+<style>
+  :root {
+    --accent: #b46be0;
+    --accent-soft: rgba(180, 107, 224, .35);
+    --panel: rgba(18, 12, 34, .82);
+    --panel-border: rgba(196, 150, 255, .35);
+    --text: #f2eafc;
+    --muted: #a99cc0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0816; color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif; user-select: none; }
+
+  #bg { position: fixed; inset: -20px; background: url("{{BG}}") center / cover no-repeat; }
+  #vignette { position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 35% 40%, transparent 30%, rgba(5, 2, 12, .75) 100%); }
+
+  /* ---------- портрет ---------- */
+  #stage { position: fixed; left: 0; right: 0; top: 0; bottom: 210px; display: flex; align-items: flex-end;
+    justify-content: center; pointer-events: none; }
+  #portrait-wrap { position: relative; height: min(92%, 680px); aspect-ratio: 4 / 5; margin-bottom: -14px;
+    transition: filter .6s ease; }
+  /* два шари для плавної зміни спрайта (crossfade), без жодного руху */
+  .sprite { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%;
+    opacity: 0; transition: opacity .35s ease; filter: drop-shadow(0 0 24px var(--accent-soft)); }
+  .sprite.on { opacity: 1; }
+  /* запасний портрет (вирізаний зі шпалер JPG) — з м'якими краями */
+  .sprite.photo { object-fit: cover; border-radius: 26px 26px 0 0; filter: none;
+    -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 78%, transparent 100%); box-shadow: 0 0 60px var(--accent-soft); }
+  .thinking #portrait-wrap { filter: brightness(.85) saturate(.9); }
+  .paused #portrait-wrap { filter: grayscale(1) brightness(.45); }
+
+  /* ---------- анімації емоцій ----------
+     #portrait-wrap — «поза»: куди Сісі зміщується й як тримається, поки триває емоція (плавний перехід);
+     #react — одноразова реакція в момент зміни емоції (стрибок, здригання тощо). Під час мовлення — спокій. */
+  #portrait-wrap { transform-origin: 50% 100%; transition: filter .6s ease, transform .7s cubic-bezier(.3,.7,.3,1);
+    aspect-ratio: 832 / 1216; }
+  #react { position: absolute; inset: 0; transform-origin: 50% 100%; }
+
+  /* ---------- дихання: груди ледь піднімаються, плечі за ними ---------- */
+  #breath { position: absolute; inset: 0; transform-origin: 50% 100%; animation: breathe 4.2s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { transform: scaleY(1) translateY(0); }
+                       45% { transform: scaleY(1.011) translateY(-1.5px); } }
+  body[data-emo="laugh"] #breath, body[data-emo="surprised"] #breath, body[data-emo="angry"] #breath
+    { animation-duration: 2.4s; }                          /* хвилюється — дихає частіше */
+  body[data-emo="sleepy"] #breath, body[data-emo="sad"] #breath { animation-duration: 6s; }   /* повільно, глибоко */
+  .paused #breath { animation-duration: 7s; }
+
+  /* ---------- ефекти над головою (координати — у відсотках від спрайта 832x1216) ---------- */
+  #fx { position: absolute; inset: 0; pointer-events: none; }
+  .fx { position: absolute; transform: translate(-50%, -50%); font-weight: 900; line-height: 1;
+    font-family: "Segoe UI Black", "Segoe UI", sans-serif; }
+  .fx.out { opacity: 0 !important; transition: opacity .4s; }
+  .ink { color: #fff; -webkit-text-stroke: 3px #2a1640; paint-order: stroke fill;
+    text-shadow: 0 0 12px rgba(180, 107, 224, .8); }
+
+  .fx-bang  { left: 76%; top: 14%; font-size: 64px; animation: bang .5s cubic-bezier(.2,1.8,.4,1) both; }
+  @keyframes bang { 0% { transform: translate(-50%,-30%) scale(0) rotate(-20deg); }
+                    100% { transform: translate(-50%,-50%) scale(1) rotate(8deg); } }
+  .fx-q     { left: 76%; top: 15%; font-size: 54px; animation: bob 2.2s ease-in-out infinite both; }
+  .fx-dots  { left: 74%; top: 17%; font-size: 40px; letter-spacing: 4px; }
+  .fx-dots span { display: inline-block; animation: dot 1.4s infinite; }
+  .fx-dots span:nth-child(2) { animation-delay: .25s; } .fx-dots span:nth-child(3) { animation-delay: .5s; }
+  .fx-z     { font-size: 30px; color: #cfc4ff; -webkit-text-stroke: 2px #2a1640; paint-order: stroke fill;
+    animation: zfloat 3.2s ease-in infinite; }
+  @keyframes zfloat { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.6); }
+                      20% { opacity: 1; } 100% { opacity: 0; transform: translate(10%, -260%) scale(1.3) rotate(12deg); } }
+  .fx-note  { font-size: 40px; color: #ffd36e; -webkit-text-stroke: 2px #4a2a10; paint-order: stroke fill;
+    animation: note 1.6s ease-out both; }
+  @keyframes note { 0% { opacity: 0; transform: translate(-50%,-20%) scale(.5); } 25% { opacity: 1; }
+                    100% { opacity: 0; transform: translate(-10%, -220%) scale(1.1) rotate(-15deg); } }
+  .fx-spark { font-size: 34px; color: #fff6c8; text-shadow: 0 0 14px #ffd36e; animation: spark 1.4s ease-out both; }
+  @keyframes spark { 0% { opacity: 0; transform: translate(-50%,-50%) scale(0) rotate(0); }
+                     40% { opacity: 1; transform: translate(-50%,-50%) scale(1.15) rotate(45deg); }
+                     100% { opacity: 0; transform: translate(-50%,-50%) scale(.6) rotate(90deg); } }
+  .fx-glint { left: 63%; top: 43%; font-size: 30px; color: #fff; text-shadow: 0 0 12px #e7a8ff;
+    animation: spark 1.1s ease-out both; }
+  .fx-heart { font-size: 26px; color: #ff7fb2; -webkit-text-stroke: 1.5px #5a1030; paint-order: stroke fill;
+    animation: note 2s ease-out both; }
+  .fx-blush { left: 50%; top: 49%; width: 46%; height: 10%; transform: translate(-50%,-50%); border-radius: 50%;
+    background: radial-gradient(ellipse at 28% 50%, rgba(255,110,150,.45), transparent 32%),
+                radial-gradient(ellipse at 74% 40%, rgba(255,110,150,.45), transparent 32%);
+    animation: fadein .6s ease-out both; }
+  .fx-drop  { left: 64%; top: 30%; width: 22px; height: 32px; background: linear-gradient(160deg, #e9f7ff, #8fd0ff);
+    border: 2.5px solid #2a4060; border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%; transform: translate(-50%,-50%) rotate(-12deg);
+    animation: drip 2.4s ease-in infinite; }
+  @keyframes drip { 0% { opacity: 0; transform: translate(-50%,-80%) rotate(-12deg) scale(.6); } 25% { opacity: 1; transform: translate(-50%,-50%) rotate(-12deg) scale(1); }
+                    80% { opacity: 1; transform: translate(-50%, 40%) rotate(-12deg); } 100% { opacity: 0; transform: translate(-50%, 80%) rotate(-12deg); } }
+  .fx-vein  { left: 68%; top: 22%; width: 56px; height: 56px; animation: vein .9s ease-in-out infinite; }
+  @keyframes vein { 0%, 100% { transform: translate(-50%,-50%) scale(.85); } 50% { transform: translate(-50%,-50%) scale(1.08); } }
+  .fx-gloom { left: 50%; top: 18%; width: 80%; height: 40%; transform: translate(-50%,-50%);
+    background: radial-gradient(ellipse at 50% 30%, rgba(70, 90, 160, .35), transparent 65%); animation: fadein 1s both; }
+  .fx-lines { left: 50%; top: 8%; width: 60%; height: 14%; transform: translate(-50%,-50%);
+    background: repeating-linear-gradient(90deg, transparent 0 18px, rgba(60,70,120,.55) 18px 21px, transparent 21px 40px);
+    -webkit-mask-image: linear-gradient(to bottom, #000, transparent); mask-image: linear-gradient(to bottom, #000, transparent);
+    animation: fadein 1s both; }
+  @keyframes bob { 0%,100% { transform: translate(-50%,-50%) rotate(-6deg); } 50% { transform: translate(-50%,-60%) rotate(6deg); } }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  .sprite { filter: drop-shadow(0 0 24px var(--aura, var(--accent-soft))); }
+  .sprite.photo { box-shadow: 0 0 60px var(--aura, var(--accent-soft)); }
+  .sprite.frame { transition: none; opacity: 0; }
+  .sprite.frame.on { opacity: 1; }
+
+  body[data-emo="happy"]     { --aura: rgba(255, 200, 120, .45); }
+  body[data-emo="laugh"]     { --aura: rgba(255, 210, 120, .5); }
+  body[data-emo="smug"]      { --aura: rgba(200, 110, 255, .5); }
+  body[data-emo="shy"]       { --aura: rgba(255, 120, 170, .55); }
+  body[data-emo="sad"]       { --aura: rgba(90, 130, 220, .4); }
+  body[data-emo="angry"]     { --aura: rgba(255, 80, 90, .5); }
+  body[data-emo="surprised"] { --aura: rgba(150, 230, 255, .5); }
+  body[data-emo="worried"]   { --aura: rgba(150, 160, 230, .4); }
+  body[data-emo="sleepy"]    { --aura: rgba(110, 100, 170, .3); }
+
+  body[data-emo="happy"] #portrait-wrap     { transform: translateY(-4px) scale(1.01); }
+  body[data-emo="smug"] #portrait-wrap      { transform: translateX(18px) rotate(1.6deg); }
+  body[data-emo="shy"] #portrait-wrap       { transform: translate(-26px, 10px) scale(.97) rotate(-1.4deg); }
+  body[data-emo="sad"] #portrait-wrap       { transform: translateY(16px) scale(.98); filter: saturate(.75) brightness(.9); }
+  body[data-emo="angry"] #portrait-wrap     { transform: translateY(-2px) scale(1.02); }
+  body[data-emo="surprised"] #portrait-wrap { transform: translateY(-8px) scale(1.03); }
+  body[data-emo="thinking"] #portrait-wrap  { transform: translateX(-14px) rotate(-1deg); }
+  body[data-emo="worried"] #portrait-wrap   { transform: translateY(6px) scale(.99); }
+  body[data-emo="sleepy"] #portrait-wrap    { transform: translateY(14px) rotate(-1.2deg); filter: brightness(.8); }
+
+  .r-happy     { animation: hop .55s ease-out; }
+  .r-laugh     { animation: laugh .9s ease-out; }
+  .r-smug      { animation: lean .7s ease-out; }
+  .r-shy       { animation: shrink .7s ease-out; }
+  .r-sad       { animation: sigh 1.2s ease-in-out; }
+  .r-angry     { animation: huff .45s ease-in-out; }
+  .r-surprised { animation: startle .5s cubic-bezier(.2,1.6,.4,1); }
+  .r-thinking  { animation: ponder 1.2s ease-in-out; }
+  .r-worried   { animation: tremble .6s ease-in-out; }
+  .r-sleepy    { animation: nod 1.6s ease-in-out; }
+  .r-calm      { animation: settle .6s ease-out; }
+
+  @keyframes hop     { 0%,100% { transform: none; } 40% { transform: translateY(-16px); } 70% { transform: translateY(2px); } }
+  @keyframes laugh   { 0%,100% { transform: none; } 15% { transform: translateY(-12px) rotate(-1deg); } 30% { transform: translateY(0); }
+                       45% { transform: translateY(-9px) rotate(1deg); } 60% { transform: translateY(0); } 75% { transform: translateY(-4px); } }
+  @keyframes lean    { 0% { transform: rotate(-2deg) translateX(-10px); } 60% { transform: rotate(1deg); } 100% { transform: none; } }
+  @keyframes shrink  { 0% { transform: none; } 30% { transform: scale(.94) translateY(6px); } 100% { transform: none; } }
+  @keyframes sigh    { 0%,100% { transform: none; } 35% { transform: translateY(-6px) scale(1.01); } 70% { transform: translateY(6px) scale(.99); } }
+  @keyframes huff    { 0%,100% { transform: none; } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); }
+                       60% { transform: translateX(-5px); } 80% { transform: translateX(4px); } }
+  @keyframes startle { 0% { transform: scale(.97); } 45% { transform: translateY(-18px) scale(1.05); } 100% { transform: none; } }
+  @keyframes ponder  { 0%,100% { transform: none; } 50% { transform: rotate(-1.5deg) translateX(-6px); } }
+  @keyframes tremble { 0%,100% { transform: none; } 20%,60% { transform: translateX(-3px); } 40%,80% { transform: translateX(3px); } }
+  @keyframes nod     { 0%,100% { transform: none; } 40% { transform: translateY(10px) rotate(-2deg); } 60% { transform: translateY(8px) rotate(-1deg); } }
+  @keyframes settle  { 0% { transform: translateY(-4px); } 100% { transform: none; } }
+
+  /* ---------- діалогове вікно ---------- */
+  #dialog { position: fixed; left: 50%; transform: translateX(-50%); bottom: 64px; width: min(92vw, 940px);
+    min-height: 136px; padding: 26px 30px 22px; background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 18px; backdrop-filter: blur(8px); box-shadow: 0 10px 40px rgba(0, 0, 0, .5); cursor: pointer; }
+  #name { position: absolute; top: -17px; left: 26px; padding: 5px 18px; border-radius: 10px;
+    background: linear-gradient(135deg, #8f4fd0, #c47ae8); font-weight: 700; letter-spacing: .5px;
+    box-shadow: 0 4px 14px rgba(150, 80, 220, .5); }
+  #text { font-size: 19px; line-height: 1.55; white-space: pre-wrap; min-height: 60px; user-select: text; }
+  #you { position: absolute; top: -15px; right: 26px; max-width: 55%; padding: 4px 12px; border-radius: 10px;
+    background: rgba(255, 255, 255, .08); color: var(--muted); font-size: 13px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .3s; }
+  #you.show { opacity: 1; }
+  #next { position: absolute; right: 22px; bottom: 12px; color: var(--accent); opacity: 0; font-size: 14px;
+    animation: blink 1s infinite; }
+  #next.show { opacity: 1; }
+  #dots span { display: inline-block; animation: dot 1.2s infinite; }
+  #dots span:nth-child(2) { animation-delay: .2s; } #dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes dot { 0%, 60%, 100% { transform: translateY(0); opacity: .4; } 30% { transform: translateY(-5px); opacity: 1; } }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  /* ---------- ввід ---------- */
+  #bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; width: min(92vw, 940px);
+    display: flex; gap: 8px; align-items: center; }
+  #input { flex: 1; height: 38px; padding: 0 16px; border-radius: 19px; border: 1px solid var(--panel-border);
+    background: rgba(18, 12, 34, .75); color: var(--text); font-size: 15px; outline: none; }
+  #input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .btn { height: 38px; min-width: 38px; padding: 0 12px; border-radius: 19px; border: 1px solid var(--panel-border);
+    background: rgba(18, 12, 34, .75); color: var(--text); cursor: pointer; font-size: 15px; }
+  .btn:hover { border-color: var(--accent); }
+  #status { position: fixed; top: 12px; right: 16px; padding: 5px 12px; border-radius: 10px; font-size: 13px;
+    background: rgba(18, 12, 34, .7); color: var(--muted); opacity: 0; transition: opacity .4s; }
+  #status.show { opacity: 1; }
+
+  /* ---------- історія ---------- */
+  #history { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 90vw); padding: 18px 18px 70px;
+    background: rgba(12, 8, 24, .94); border-left: 1px solid var(--panel-border); overflow-y: auto;
+    transform: translateX(105%); transition: transform .3s ease; user-select: text; }
+  #history.open { transform: translateX(0); }
+  #history h3 { margin: 0 0 12px; color: var(--accent); font-size: 15px; }
+  .h { margin: 0 0 10px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+  .h b { color: var(--accent); } .h.me b { color: #8fc7ff; } .h small { color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="bg"></div><div id="vignette"></div>
+
+<div id="stage"><div id="portrait-wrap"><div id="react">
+  <div id="breath">
+    <img class="sprite" id="sA" alt="Сісі"><img class="sprite" id="sB" alt="">
+    <img class="sprite frame" id="ov" alt="">
+  </div>
+  <div id="fx"></div>
+</div></div></div>
+
+<div id="dialog" title="Клік — далі">
+  <div id="name">Сісі</div>
+  <div id="you"></div>
+  <div id="text"></div>
+  <div id="next">▼</div>
+</div>
+
+<div id="bar">
+  <button class="btn" id="hist-btn" title="Історія">📜</button>
+  <input id="input" placeholder="Напиши Сісі… (або тримай клавішу push-to-talk)" autocomplete="off">
+  <button class="btn" id="send" title="Надіслати">➤</button>
+</div>
+<div id="status"></div>
+
+<div id="history"><h3>Історія</h3><div id="log"></div></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const body = document.body;
+  const state = { queue: [], typing: false, waiting: null, ttsPlaying: false, skip: false };
+
+  // ---------- спрайти емоцій ----------
+  const sprites = {};            // кеш: емоція -> data URL ("" = спрайта нема)
+  let curEmotion = null, front = "sA", calmTimer = null;   // null — щоб при старті одразу підвантажився calm
+  const CALM_AFTER_MS = 8000;    // через стільки після відповіді повертається спокійний спрайт
+
+  async function spriteUrl(name) {
+    if (!(name in sprites)) sprites[name] = await window.pywebview.api.sprite(name);
+    return sprites[name];
+  }
+  const frames = { talk: "", blink: "" };    // додаткові кадри поточної емоції (рот відкритий / очі закриті)
+
+  // ---------- ефекти емоцій ----------
+  const VEIN = `<svg viewBox="0 0 100 100" width="100%" height="100%"><g fill="none" stroke="#e8304a" stroke-width="11"
+    stroke-linecap="round"><path d="M38 12 Q40 36 14 38"/><path d="M62 12 Q60 36 86 38"/><path d="M38 88 Q40 64 14 62"/>
+    <path d="M62 88 Q60 64 86 62"/></g></svg>`;
+  function fx(cls, html, left, top, delay, life) {
+    const el = document.createElement("div");
+    el.className = "fx " + cls;
+    el.innerHTML = html || "";
+    if (left != null) el.style.left = left + "%";
+    if (top != null) el.style.top = top + "%";
+    if (delay) el.style.animationDelay = delay + "s";
+    $("fx").appendChild(el);
+    if (life) setTimeout(() => el.remove(), (life + (delay || 0)) * 1000);
+    return el;
+  }
+  function clearFx() {
+    for (const el of [...$("fx").children]) { el.classList.add("out"); setTimeout(() => el.remove(), 400); }
+  }
+  const EFFECTS = {
+    surprised: () => { fx("fx-bang ink", "!", null, null, 0, 2.2); fx("fx-bang ink", "!", 84, 20, .12, 2.1).style.fontSize = "40px"; },
+    happy: () => { [[24, 20], [80, 24], [70, 8], [30, 6]].forEach(([l, t], i) => fx("fx-spark", "✦", l, t, i * .18, 1.8)); },
+    laugh: () => { ["♪", "♫", "♪"].forEach((n, i) => fx("fx-note", n, 74 + i * 5, 26 - i * 3, i * .3, 2.2));
+                   fx("fx-spark", "✦", 26, 16, .2, 1.6); },
+    smug:  () => { fx("fx-glint", "✦", null, null, .15, 1.4); fx("fx-spark", "✧", 76, 18, .45, 1.6); },
+    shy:   () => { fx("fx-blush"); [[72, 30], [78, 24]].forEach(([l, t], i) => fx("fx-heart", "♥", l, t, .3 + i * .5, 2.6)); },
+    sad:   () => { fx("fx-gloom"); fx("fx-lines"); },
+    angry: () => { fx("fx-vein", VEIN); },
+    thinking: () => { fx("fx-dots ink", "<span>.</span><span>.</span><span>.</span>"); },
+    worried: () => { fx("fx-drop"); },
+    sleepy: () => { [0, 1.05, 2.1].forEach((d, i) => fx("fx-z", "z", 70 + i * 3, 22 - i * 2, d).style.fontSize = (24 + i * 8) + "px"); },
+  };
+  function setFx(name) { clearFx(); if (EFFECTS[name]) setTimeout(() => EFFECTS[name](), 120); }
+
+  function react(name) {                      // одноразова реакція на зміну емоції
+    const r = $("react");
+    r.className = ""; void r.offsetWidth; r.className = "r-" + name;
+  }
+  async function setEmotion(name) {
+    if (!name || name === curEmotion) return;
+    curEmotion = name;
+    body.dataset.emo = name;                  // поза й колір аури — навіть якщо окремого спрайта нема
+    react(name);
+    setFx(name);
+    $("ov").classList.remove("on");
+    const [url, talk, blink] = await Promise.all([spriteUrl(name), spriteUrl(name + "_talk"), spriteUrl(name + "_blink")]);
+    if (curEmotion !== name) return;          // поки вантажилось, емоція вже змінилась
+    frames.talk = talk; frames.blink = blink;
+    if (!url) return;                         // спрайта для цієї емоції ще нема — лишаємо поточний образ
+    const backId = front === "sA" ? "sB" : "sA", back = $(backId), cur = $(front);
+    back.onload = () => { back.classList.add("on"); cur.classList.remove("on"); front = backId; };
+    back.classList.toggle("photo", url.startsWith("data:image/jpeg"));
+    back.src = url;
+  }
+
+  // рот під час мовлення: чергуємо кадр <емоція>_talk з основним (якщо такий кадр є)
+  setInterval(() => {
+    const ov = $("ov"), talking = state.typing || state.ttsPlaying;
+    if (talking && frames.talk) {
+      if (ov.dataset.f !== "talk") { ov.src = frames.talk; ov.dataset.f = "talk"; }
+      ov.classList.toggle("on", Math.random() < 0.55);
+    } else if (ov.dataset.f === "talk") { ov.classList.remove("on"); }
+  }, 130);
+  // кліпання: раз на 2.5–6 с на 130 мс (якщо є кадр <емоція>_blink і вона не говорить)
+  (function blinkLoop() {
+    setTimeout(() => {
+      const ov = $("ov");
+      if (frames.blink && !(state.typing || state.ttsPlaying)) {
+        ov.src = frames.blink; ov.dataset.f = "blink"; ov.classList.add("on");
+        setTimeout(() => { if (ov.dataset.f === "blink") ov.classList.remove("on"); }, 130);
+      }
+      blinkLoop();
+    }, 2500 + Math.random() * 3500);
+  })();
+  function clearSprites() { for (const k in sprites) delete sprites[k]; const e = curEmotion; curEmotion = null; setEmotion(e || "calm"); }
+  function scheduleCalm() {
+    clearTimeout(calmTimer);
+    calmTimer = setTimeout(() => { if (!state.typing && !state.queue.length && !state.ttsPlaying)
+      setEmotion(body.classList.contains("paused") ? "sleepy" : "calm"); }, CALM_AFTER_MS);
+  }
+
+  function refreshTalking() {
+    body.classList.toggle("talking", state.typing || state.ttsPlaying);
+    if (!state.typing && !state.ttsPlaying && !state.queue.length) scheduleCalm();
+  }
+  function setTalking(on) { state.ttsPlaying = on; refreshTalking(); }
+  function setThinking(on) {
+    body.classList.toggle("thinking", on);
+    if (on && !state.typing && !state.queue.length)
+      $("text").innerHTML = '<span id="dots"><span>•</span><span>•</span><span>•</span></span>';
+  }
+  function setPaused(on) {
+    body.classList.toggle("paused", on);
+    setEmotion(on ? "sleepy" : "calm");
+    if (on) { state.queue = []; $("text").textContent = "zzz… (Сісі на паузі — розбуди її в треї)"; }
+  }
+  let statusTimer;
+  function setStatus(t) {
+    $("status").textContent = t; $("status").classList.add("show");
+    clearTimeout(statusTimer); statusTimer = setTimeout(() => $("status").classList.remove("show"), 4500);
+  }
+
+  function addLog(who, text, me) {
+    const d = document.createElement("div");
+    d.className = "h" + (me ? " me" : "");
+    const t = new Date().toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" });
+    d.innerHTML = `<small>${t}</small> <b>${who}:</b> `;
+    d.appendChild(document.createTextNode(text));
+    $("log").appendChild(d); $("history").scrollTop = 1e9;
+  }
+
+  function userSaid(text, voice) {
+    $("you").textContent = (voice ? "🎙 " : "Ти: ") + text;
+    $("you").classList.add("show");
+    addLog(voice ? "Ти (голосом)" : "Ти", text, true);
+  }
+
+  // Сісі каже кілька «бульбашок» [{emotion, text}] — кожна друкується по черзі зі своїм спрайтом
+  function sisiSay(bubbles, proactive) {
+    clearTimeout(calmTimer);
+    bubbles.forEach(b => { state.queue.push(b); addLog("Сісі", b.text, false); });
+    if (!state.typing && !state.waiting) next();
+  }
+
+  function next() {
+    clearTimeout(state.waiting); state.waiting = null; $("next").classList.remove("show");
+    const b = state.queue.shift();
+    if (!b) { refreshTalking(); return; }
+    if (b.emotion) setEmotion(b.emotion);
+    typeOut(b.text);
+  }
+
+  function typeOut(text) {
+    state.typing = true; state.skip = false; refreshTalking();
+    const el = $("text"); el.textContent = ""; let i = 0;
+    (function step() {
+      if (state.skip) i = text.length;
+      el.textContent = text.slice(0, i);
+      if (i < text.length) { i += 1; setTimeout(step, /[.,!?…]/.test(text[i - 1]) ? 110 : 28); return; }
+      state.typing = false; refreshTalking();
+      if (state.queue.length) {
+        $("next").classList.add("show");
+        state.waiting = setTimeout(next, 900 + Math.min(text.length * 25, 2600));
+      }
+    })();
+  }
+
+  $("dialog").addEventListener("click", () => { if (state.typing) state.skip = true; else if (state.queue.length) next(); });
+  $("hist-btn").addEventListener("click", () => $("history").classList.toggle("open"));
+
+  function send() {
+    const v = $("input").value.trim(); if (!v) return;
+    $("input").value = ""; userSaid(v, false);
+    window.pywebview.api.send(v);
+  }
+  $("send").addEventListener("click", send);
+  $("input").addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); send(); }
+    if (e.key === "Escape") $("history").classList.remove("open");
+  });
+  window.addEventListener("pywebviewready", () => {
+    $("input").focus();
+    setEmotion("calm");                       // одразу показати спрайт (на паузі Python перемкне на sleepy)
+    window.pywebview.api.ready();
+  });
+</script>
+</body>
+</html>

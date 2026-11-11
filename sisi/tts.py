@@ -33,6 +33,7 @@ class TTS:
         self._q = queue.Queue()       # текст -> синтез
         self._play_q = queue.Queue()  # готовий звук -> програвач
         self._gen = 0  # номер «покоління»: stop() скасовує все, що було в черзі
+        self.on_playing = lambda playing: None  # вікно анімує аватар, поки звучить голос
         threading.Thread(target=self._loop, daemon=True, name="sisi-tts").start()
         threading.Thread(target=self._player, daemon=True, name="sisi-tts-play").start()
 
@@ -77,7 +78,11 @@ class TTS:
             if gen != self._gen:
                 continue
             try:
+                self.on_playing(True)
                 sd.play(audio, rate)
                 sd.wait()
             except Exception as e:  # noqa: BLE001
                 log_action("tts_error", str(e)[:200])
+            finally:
+                if self._play_q.empty():
+                    self.on_playing(False)

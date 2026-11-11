@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
+rem Сісі з вікном (без консолі). Консольна версія: run_sisi_console.bat
 cd /d "%~dp0"
-".venv\Scripts\python.exe" -m sisi.chat
-pause
+start "" ".venv\Scripts\pythonw.exe" -m sisi.gui

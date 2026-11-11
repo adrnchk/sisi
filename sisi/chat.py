@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 
-from . import brain, settings
+from . import brain, emotions, settings
 from .notify import toast
 from .tts import TTS
 from .tray import Tray
@@ -15,9 +15,15 @@ NAME = "Сісі"
 _print_lock = threading.Lock()
 
 
-def _bubbles(text: str):
+def _bubbles_with_emotions(text: str):
+    """[(емоція або None, текст бульбашки)]"""
     parts = re.split(r"^\s*-{3,}\s*$", text, flags=re.MULTILINE)
-    return [p.strip() for p in parts if p.strip()]
+    out = [emotions.parse(p) for p in parts if p.strip()]
+    return [(e, t) for e, t in out if t]
+
+
+def _bubbles(text: str):
+    return [t for _, t in _bubbles_with_emotions(text)]
 
 
 class App:

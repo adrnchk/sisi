@@ -10,7 +10,7 @@ from datetime import datetime
 import psutil
 
 from .paths import DATA, HOME, MCP_CONFIG, MEMORY, PERSONA, ROOT
-from . import settings
+from . import emotions, settings
 from .store import get_state, update_state
 
 MODEL = os.environ.get("SISI_MODEL", "sonnet")
@@ -33,9 +33,19 @@ def _claude_exe():
 
 
 def _system_prompt():
-    persona = PERSONA.read_text(encoding="utf-8")
+    persona = PERSONA.read_text(encoding="utf-8").replace("{ROOT}", str(ROOT))
     memory = MEMORY.read_text(encoding="utf-8") if MEMORY.exists() else ""
-    return f"{persona}\n\n---\n\n{memory}"
+    emo = (
+        "## Твої емоції (спрайти у вікні)\n"
+        "Починай **кожну** бульбашку з тегу емоції, яку ти зараз відчуваєш, — у вікні підставиться "
+        "твій відповідний образ. Обирай чесно, по ситуації: жарт хазяїна — `[laugh]`, комплімент — `[shy]`, "
+        "звичайна розмова — `[calm]`. Емоція може змінюватись між бульбашками однієї відповіді.\n"
+        "Приклад:\n`[laugh] ахаха, ну ти й скажеш`\n`---`\n`[smug] але жарт зарахований`\n\n"
+        "Доступні теги (лише ці, англійською, у квадратних дужках на самому початку бульбашки):\n"
+        f"{emotions.persona_list()}\n"
+        "Відповідь `SKIP` на подію пиши без тегу."
+    )
+    return f"{persona}\n\n---\n\n{emo}\n\n---\n\n{memory}"
 
 
 def _write_mcp_config():
@@ -102,6 +112,7 @@ def _run(message, session_id):
     if session_id:
         cmd += ["--resume", session_id]
     proc = subprocess.run(cmd, cwd=HOME, env=_clean_env(), capture_output=True, text=True,
+                          creationflags=subprocess.CREATE_NO_WINDOW,  # без миготіння консолі
                           encoding="utf-8", errors="replace", timeout=600)
     try:
         data = json.loads(proc.stdout)
@@ -141,7 +152,7 @@ def event(description: str):
         f"{description}\n"
         f"Якщо тобі справді є що сказати — напиши хазяїну першою. Якщо ні — відповідай рівно {SKIP}."
     )
-    if not text or text.strip().strip(".").upper() == SKIP:
+    if not text or emotions.strip(text).strip().strip(".").upper() == SKIP:
         return None
     return text
 

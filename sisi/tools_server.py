@@ -33,7 +33,7 @@ mcp = FastMCP("sisi")
 UA = "Sisi/0.1 (personal desktop assistant)"
 MAX_IMAGE_BYTES = 40 * 1024 * 1024
 WALLPAPER_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
-MEMORY_SECTIONS = ["Словник користувача", "Про користувача", "Стосунки"]
+MEMORY_SECTIONS = ["Словник користувача", "Про користувача", "Стосунки", "Справи"]
 
 SPI_GETDESKWALLPAPER = 0x0073
 SPI_SETDESKWALLPAPER = 0x0014
@@ -199,6 +199,7 @@ def list_desktop() -> str:
 def list_running_apps() -> str:
     """Показує, які програми зараз запущені (лише назви процесів з вікнами)."""
     out = subprocess.run(["tasklist", "/v", "/fo", "csv", "/nh"], capture_output=True,
+                         creationflags=subprocess.CREATE_NO_WINDOW,
                          text=True, encoding="cp866", errors="replace").stdout
     apps = set()
     for row in csv.reader(io.StringIO(out)):
@@ -268,6 +269,8 @@ def remember(section: str, fact: str) -> str:
     if section not in MEMORY_SECTIONS:
         return "Помилка: section має бути одним з: " + ", ".join(MEMORY_SECTIONS)
     fact = " ".join(fact.split())
+    if section == "Справи":  # журнал прохань: дата + статус
+        fact = f"[ ] {datetime.now():%d.%m.%Y} — {fact}"
     text = MEMORY.read_text(encoding="utf-8") if MEMORY.exists() else "# Пам'ять Сісі\n"
     header = f"## {section}"
     if header not in text:
@@ -281,6 +284,50 @@ def remember(section: str, fact: str) -> str:
     MEMORY.write_text(text, encoding="utf-8")
     log_action("remember", f"{section}: {fact}")
     return "Запам'ятала."
+
+
+@mcp.tool()
+def finish_task(text: str) -> str:
+    """Позначає справу з розділу «Справи» виконаною. `text` — частина її формулювання."""
+    if not MEMORY.exists():
+        return "Пам'ять порожня."
+    lines = MEMORY.read_text(encoding="utf-8").split("\n")
+    needle = text.casefold().strip()
+    for i, ln in enumerate(lines):
+        if ln.startswith("- [ ] ") and needle in ln.casefold():
+            lines[i] = ln.replace("- [ ] ", "- [x] ", 1)
+            MEMORY.write_text("\n".join(lines), encoding="utf-8")
+            log_action("finish_task", ln)
+            return "Позначила виконаною."
+    return "Не знайшла такої відкритої справи."
+
+
+@mcp.tool()
+def tidy_memory() -> str:
+    """Прибирає з пам'яті дублікати рядків і виконані справи, старші за 30 днів. Решту не чіпає."""
+    if not MEMORY.exists():
+        return "Пам'ять порожня."
+    out, seen, removed = [], set(), 0
+    for ln in MEMORY.read_text(encoding="utf-8").split("\n"):
+        if ln.startswith("## "):
+            seen = set()
+        if ln.startswith("- "):
+            key = ln.casefold().strip()
+            old_done = False
+            if ln.startswith("- [x] "):
+                try:
+                    d = datetime.strptime(ln[6:16], "%d.%m.%Y")
+                    old_done = (datetime.now() - d).days > 30
+                except ValueError:
+                    pass
+            if key in seen or old_done:
+                removed += 1
+                continue
+            seen.add(key)
+        out.append(ln)
+    MEMORY.write_text("\n".join(out), encoding="utf-8")
+    log_action("tidy_memory", f"прибрано {removed}")
+    return f"Прибрано рядків: {removed}."
 
 
 if __name__ == "__main__":

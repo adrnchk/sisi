@@ -1,5 +1,41 @@
+# ---------- Python ----------
 .venv/
+venv/
 __pycache__/
-data/
-# особиста пам'ять Сісі лишається тільки на цьому ПК
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ---------- особисте й локальне: на цьому ПК, не в репо ----------
+# пам'ять Сісі про хазяїна
 memory/user.md
+memory/*.bak
+# усе в data/ — журнали дій, стан, налаштування, нагадування, шпалери, кандидати генерації
+data/*
+# ...крім спрайтів Сісі (її вигляд — частина проєкту)
+!data/assets/
+data/assets/*
+!data/assets/sprites/
+data/assets/sprites/*
+!data/assets/sprites/*.png
+!data/assets/sprites/*.webp
+!data/assets/sprites/*.svg
+!data/assets/sprites/*.txt
+
+# логи й тимчасове
+*.log
+*.tmp
+*.bak
+
+# секрети (на майбутнє)
+.env
+.env.*
+*.key
+*.pem
+
+# ---------- системне ----------
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

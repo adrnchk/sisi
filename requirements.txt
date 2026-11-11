@@ -9,3 +9,4 @@ numpy>=1.26
 faster-whisper>=1.0
 edge-tts>=6.1
 miniaudio>=1.59
+pywebview>=5

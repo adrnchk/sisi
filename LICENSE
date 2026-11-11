@@ -1,0 +1,31 @@
+Copyright (c) 2026 Adrian (GitHub: adrnchk). All rights reserved.
+
+PROPRIETARY LICENSE — "Sisi"
+
+This repository, including but not limited to its source code, the character
+"Sisi" (her name, personality and persona description, dialogue style), the
+character sprites and other artwork, documentation and configuration
+(together, the "Software"), is the exclusive property of the copyright holder.
+
+No license is granted. Without prior explicit written permission from the
+copyright holder, you may NOT:
+
+  1. copy, reproduce or redistribute the Software or any part of it;
+  2. modify, adapt, translate or create derivative works based on it;
+  3. use the Software, the character "Sisi" or her artwork in any other
+     project, product, service, publication, or AI/ML training dataset;
+  4. sell, sublicense, rent, publish or otherwise commercially exploit it.
+
+Viewing this repository on a hosting platform (e.g. GitHub) does not grant
+any rights beyond those the platform's terms of service strictly require.
+
+Third-party components (Python packages, AI models and other tools used by the
+Software) remain under their own respective licenses and are not covered by
+this notice. Character sprites were generated with Animagine XL 4.0
+(CreativeML OpenRAIL++-M), whose use-based restrictions also apply.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+
+For permission requests, contact the copyright holder via GitHub (@adrnchk).
